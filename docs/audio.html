@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>翻牌语音附件</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#25283a;background:#f5f7fb;--purple:#6657f6;--line:#e6e9f1;--muted:#6d7484;--red:#c44959;--green:#16835f}
+    *{box-sizing:border-box}body{margin:0}.wrap{max-width:900px;margin:auto;padding:28px 16px 48px}h1{font-size:28px;margin:0}h2{font-size:18px;margin:0 0 14px}.sub,.hint{color:var(--muted);font-size:13px}.sub{margin:6px 0 20px}.panel{background:#fff;border:1px solid var(--line);border-radius:15px;padding:20px;margin:14px 0;box-shadow:0 5px 18px #1720440a}label{display:block;color:var(--muted);font-size:13px;margin:0 0 6px}input,textarea,button{font:inherit;border-radius:9px}input[type=text],textarea{width:100%;padding:10px 11px;border:1px solid var(--line)}textarea{min-height:75px;resize:vertical}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:13px}button{border:0;background:var(--purple);color:white;padding:10px 14px;font-weight:600;cursor:pointer}button.secondary{background:#eef0f6;color:#25283a}button.delete{background:#fff0f2;color:var(--red);padding:7px 10px}.actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.notice{background:#fff8e4;border:1px solid #f1e0a9;border-radius:10px;padding:12px;color:#705b20;font-size:13px}.audio-item{border-top:1px solid var(--line);padding:14px 0}.audio-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.audio-title{font-weight:700;word-break:break-word}.audio-meta{color:var(--muted);font-size:12px;margin:4px 0 8px}audio{width:100%;margin:8px 0}.transcript{white-space:pre-wrap;overflow-wrap:anywhere;background:#f8f9fc;padding:10px;border-radius:8px;margin:8px 0}.empty{padding:24px;color:var(--muted);text-align:center}.status{font-size:13px;color:var(--green);margin-top:8px}@media(max-width:600px){.row{grid-template-columns:1fr}.wrap{padding-top:20px}.panel{padding:16px}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <h1>🎙️ 翻牌语音附件</h1>
+  <p class="sub">保存并播放自己��语音文件，支持下载原文件和附加文字转写。文件仅保存在当前浏览器设备。</p>
+  <section class="panel">
+    <h2>添加语音</h2>
+    <form id="form">
+      <div class="row">
+        <div class="field"><label for="title">标题 / 对应成员</label><input id="title" type="text" maxlength="120" placeholder="例如：成员名 - 语音翻牌" required></div>
+        <div class="field"><label for="audioFile">音频文件</label><input id="audioFile" type="file" accept="audio/*" required></div>
+      </div>
+      <div class="field"><label for="transcript">转写文本 / 备注（可选）</label><textarea id="transcript" maxlength="10000" placeholder="可粘贴你自行获得的转写内容，或记录语音摘要"></textarea></div>
+      <button type="submit">保存到本机</button>
+      <div id="status" class="status" role="status"></div>
+    </form>
+    <p class="notice">隐私说明：网页不会上传音频，但浏览器本地存储不是加密的。请勿在共享设备使用。自动语音识别未启用；如使用第三方转写服务，请先确认其隐私政策，并避免上传他人或敏感语音。</p>
+  </section>
+  <section class="panel">
+    <h2>已保存语音</h2>
+    <div id="list"></div>
+  </section>
+</main>
+<script>
+(() => {
+  'use strict';
+  const DB_NAME = 'flip-audio-local-v1';
+  const STORE = 'clips';
+  const $ = id => document.getElementById(id);
+  const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const openDb = () => new Promise((resolve,reject) => {
+    const request = indexedDB.open(DB_NAME,1);
+    request.onupgradeneeded = () => request.result.createObjectStore(STORE,{keyPath:'id'});
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+  const run = async (mode, action) => {
+    const db = await openDb();
+    return new Promise((resolve,reject) => {
+      const tx = db.transaction(STORE,mode);
+      const store = tx.objectStore(STORE);
+      let result;
+      try { result = action(store); } catch (e) { reject(e); db.close(); return; }
+      tx.oncomplete = () => { resolve(result?.result); db.close(); };
+      tx.onerror = () => { reject(tx.error); db.close(); };
+      tx.onabort = () => { reject(tx.error); db.close(); };
+    });
+  };
+  const getAll = async () => {
+    const db = await openDb();
+    return new Promise((resolve,reject) => {
+      const tx = db.transaction(STORE,'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => db.close();
+    });
+  };
+  const formatBytes = n => n < 1024*1024 ? `${(n/1024).toFixed(0)} KB` : `${(n/1024/1024).toFixed(1)} MB`;
+  async function render(){
+    const clips = (await getAll()).sort((a,b)=>b.createdAt-a.createdAt);
+    const root = $('list');
+    if(!clips.length){root.innerHTML='<div class="empty">还没有保存的语音</div>';return;}
+    root.innerHTML = clips.map(c=>`<article class="audio-item" data-clip="${escapeHtml(c.id)}">
+      <div class="audio-head"><div><div class="audio-title">${escapeHtml(c.title)}</div><div class="audio-meta">${new Date(c.createdAt).toLocaleString()} · ${formatBytes(c.blob.size)} · ${escapeHtml(c.fileName)}</div></div><button class="delete" type="button" data-delete="${escapeHtml(c.id)}">删除</button></div>
+      <audio controls preload="none" data-audio="${escapeHtml(c.id)}"></audio>
+      ${c.transcript ? `<div class="transcript">${escapeHtml(c.transcript)}</div>` : '<div class="audio-meta">未添加转写内容</div>'}
+      <div class="actions"><button class="secondary" type="button" data-download="${escapeHtml(c.id)}">下载原音频</button><button class="secondary" type="button" data-edit="${escapeHtml(c.id)}">编辑转写</button></div>
+    </article>`).join('');
+    for (const audio of root.querySelectorAll('audio[data-audio]')) {
+      const clip = clips.find(c=>c.id===audio.dataset.audio);
+      if(clip) audio.src = URL.createObjectURL(clip.blob);
+    }
+  }
+  $('form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const file = $('audioFile').files[0];
+    if(!file || !file.type.startsWith('audio/')){alert('请选择有效的音频文件。');return;}
+    try{
+      const clip={id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,title:$('title').value.trim(),fileName:file.name,mimeType:file.type,blob:file,transcript:$('transcript').value.trim(),createdAt:Date.now()};
+      await run('readwrite',store=>store.put(clip));
+      $('form').reset();$('status').textContent='已保存在此浏览器设备。';await render();
+    }catch(err){alert(`保存失败：${err.message || '浏览器存储空间可能不足。'}`);}
+  });
+  $('list').addEventListener('click',async e=>{
+    const del=e.target.closest('[data-delete]');
+    if(del){if(!confirm('确定删除这条语音及其转写吗？'))return;await run('readwrite',s=>s.delete(del.dataset.delete));await render();return;}
+    const download=e.target.closest('[data-download]');
+    if(download){const clip=(await getAll()).find(x=>x.id===download.dataset.download);if(!clip)return;const url=URL.createObjectURL(clip.blob);const a=document.createElement('a');a.href=url;a.download=clip.fileName || 'audio';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);return;}
+    const edit=e.target.closest('[data-edit]');
+    if(edit){const clip=(await getAll()).find(x=>x.id===edit.dataset.edit);if(!clip)return;const text=prompt('编辑转写文本或备注：',clip.transcript||'');if(text===null)return;clip.transcript=text.trim();await run('readwrite',s=>s.put(clip));await render();}
+  });
+  render().catch(err=>{$('list').innerHTML=`<div class="empty">浏览器不支持本地音频存储，或存储不可用：${escapeHtml(err.message)}</div>`;});
+})();
+</script>
+</body>
+</html>
