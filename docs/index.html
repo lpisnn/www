@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <title>翻牌与鸡腿记录</title>
+  <style>
+    :root{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;color:#25283a;background:#f5f6fb;--purple:#6857e8;--border:#e6e7ef;--muted:#73778a;--green:#16835f;--red:#c44959}
+    *{box-sizing:border-box}body{margin:0}.wrap{max-width:1000px;margin:auto;padding:28px 16px 48px}header{margin-bottom:20px}h1{font-size:27px;margin:0}h2{font-size:18px;margin:0 0 15px}.sub,.hint{color:var(--muted);font-size:13px}.sub{margin-top:5px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:18px 0}.card,.panel{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 4px 16px #2222}.card{padding:16px}.label{color:var(--muted);font-size:13px}.value{font-size:25px;font-weight:700;margin-top:5px}.panel{padding:20px;margin:14px 0}.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{margin-bottom:12px}label{display:block;color:var(--muted);font-size:13px;margin:0 0 5px}input,select,textarea,button{font:inherit;border-radius:9px}input,select,textarea{width:100%;padding:10px;border:1px solid var(--border);background:white;color:#25283a}textarea{min-height:70px;resize:vertical}button,.upload{border:0;border-radius:9px;background:var(--purple);color:white;padding:10px 14px;font-weight:600;cursor:pointer}button.secondary,.upload{background:#eff0f6;color:#25283a}.upload{display:inline-flex;align-items:center}input[type=file]{display:none}.actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}.filters{display:grid;grid-template-columns:1fr 1fr 2fr;gap:9px;margin-bottom:12px}.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:660px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:top}th{font-size:13px;color:var(--muted)}.good{color:var(--green);font-weight:650}.bad{color:var(--red);font-weight:650}.del{padding:6px 9px;background:#fff0f1;color:var(--red)}.empty{text-align:center;color:var(--muted);padding:24px}.notice{background:#fff9e8;border:1px solid #f3e5b7;padding:12px 14px;border-radius:10px;color:#6b5b2b;font-size:13px;margin-top:14px}footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}@media(max-width:680px){.grid{grid-template-columns:1fr 1fr}.formgrid{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.filters input[type=search]{grid-column:1/-1}.wrap{padding-top:20px}}
+  </style>
+</head>
+<body>
+<main class="wrap">
+  <header><h1>🍗 翻牌与鸡腿记录</h1><div class="sub">个人记录工具：手动记账、查看统计、导出备份。</div></header>
+  <section class="grid" aria-label="统计">
+    <div class="card"><div class="label">翻牌总数</div><div class="value" id="totalFlips">0</div></div>
+    <div class="card"><div class="label">鸡腿总支出</div><div class="value" id="totalCost">0</div></div>
+    <div class="card"><div class="label">已回复</div><div class="value" id="replied">0</div></div>
+    <div class="card"><div class="label">未回复</div><div class="value" id="pending">0</div></div>
+  </section>
+  <section class="panel">
+    <h2>添加翻牌记录</h2>
+    <form id="form">
+      <div class="formgrid">
+        <div class="field"><label for="when">时间</label><input id="when" type="datetime-local" required></div>
+        <div class="field"><label for="member">成员</label><input id="member" maxlength="80" placeholder="成员名称" required></div>
+        <div class="field"><label for="cost">鸡腿支出</label><input id="cost" type="number" min="0" step="1" value="0" required></div>
+        <div class="field"><label for="status">回复状态</label><select id="status"><option value="pending">未回复</option><option value="replied">已回复</option></select></div>
+      </div>
+      <div class="field"><label for="question">问题/备注（可选）</label><textarea id="question" maxlength="1000" placeholder="尽量不要填写敏感个人信息"></textarea></div>
+      <button type="submit">保存记录</button>
+    </form>
+    <div class="notice">数据仅保存在当前浏览器的本地存储，不会由本网页上传到服务器。请勿在公共设备使用；本地存储不是加密的。定期导出备份，清除浏览器数据会导致记录丢失。</div>
+  </section>
+  <section class="panel">
+    <h2>数据备份</h2>
+    <div class="actions"><button id="export" type="button">导出 JSON</button><label class="upload">导入 JSON<input id="import" type="file" accept="application/json,.json"></label><button class="secondary" id="clear" type="button">清空本机记录</button></div>
+    <p class="hint">导入会替换当前浏览器中的记录；导入前建议先导出备份。备份文件保存在你选择的位置，请妥善保管。</p>
+  </section>
+  <section class="panel">
+    <h2>记录列表</h2>
+    <div class="filters"><input id="from" type="date" aria-label="开始日期"><input id="to" type="date" aria-label="结束日期"><input id="search" type="search" placeholder="搜索成员或备注"></div>
+    <div class="tablewrap"><table><thead><tr><th>时间</th><th>成员</th><th>鸡腿</th><th>状态</th><th>问题/备注</th><th>操作</th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+  <footer>本工具是独立的本地记录页，不连接口袋48，不自动采集数据。</footer>
+</main>
+<script>
+(() => {
+  'use strict';
+  const KEY = 'lpisnn-flip-ledger-v1';
+  const $ = id => document.getElementById(id);
+  const localNow = () => { const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000); return d.toISOString().slice(0,16); };
+  const safeParse = raw => { try { const x=JSON.parse(raw||'{}'); return Array.isArray(x.records)?x.records:[]; } catch { return []; } };
+  let records = safeParse(localStorage.getItem(KEY));
+  const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  function persist(){ localStorage.setItem(KEY,JSON.stringify({version:1,records})); render(); }
+  function render(){
+    const cost=records.reduce((n,r)=>n+Number(r.cost||0),0);
+    $('totalFlips').textContent=records.length.toLocaleString(); $('totalCost').textContent=cost.toLocaleString();
+    $('replied').textContent=records.filter(r=>r.status==='replied').length.toLocaleString(); $('pending').textContent=records.filter(r=>r.status!=='replied').length.toLocaleString();
+    const from=$('from').value,to=$('to').value,q=$('search').value.trim().toLocaleLowerCase();
+    const shown=[...records].filter(r=>{const day=String(r.when).slice(0,10);return (!from||day>=from)&&(!to||day<=to)&&(!q||`${r.member} ${r.question}`.toLocaleLowerCase().includes(q));}).sort((a,b)=>String(b.when).localeCompare(String(a.when)));
+    $('rows').innerHTML=shown.length?shown.map(r=>`<tr><td>${escapeHtml(String(r.when).replace('T',' '))}</td><td>${escapeHtml(r.member)}</td><td>${Number(r.cost).toLocaleString()}</td><td class="${r.status==='replied'?'good':'bad'}">${r.status==='replied'?'已回复':'未回复'}</td><td>${escapeHtml(r.question||'—')}</td><td><button class="del" type="button" data-id="${escapeHtml(r.id)}">删除</button></td></tr>`).join(''):'<tr><td class="empty" colspan="6">暂无记录</td></tr>';
+  }
+  $('when').value=localNow();
+  $('form').addEventListener('submit',e=>{e.preventDefault();const cost=Number($('cost').value);if(!Number.isSafeInteger(cost)||cost<0){alert('鸡腿支出请输入不小于 0 的整数。');return;}records.push({id:crypto.randomUUID?crypto.randomUUID():`${Date.now()}-${Math.random()}`,when:$('when').value,member:$('member').value.trim(),cost,status:$('status').value,question:$('question').value.trim()});persist();$('form').reset();$('when').value=localNow();$('cost').value='0';});
+  $('rows').addEventListener('click',e=>{const b=e.target.closest('[data-id]');if(!b)return;if(!confirm('确定删除这条记录？'))return;records=records.filter(r=>String(r.id)!==b.dataset.id);persist();});
+  ['from','to','search'].forEach(id=>$(id).addEventListener('input',render));
+  $('export').addEventListener('click',()=>{const blob=new Blob([JSON.stringify({version:1,records},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`翻牌记录-${new Date().toISOString().slice(0,10)}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
+  $('import').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{const obj=JSON.parse(await f.text());if(!Array.isArray(obj.records))throw Error('文件格式不正确。');const next=obj.records.map(r=>{if(!r||!r.when||!String(r.member||'').trim()||!Number.isSafeInteger(Number(r.cost))||Number(r.cost)<0)throw Error('记录字段无效。');return{id:String(r.id||`${Date.now()}-${Math.random()}`),when:String(r.when),member:String(r.member),cost:Number(r.cost),status:r.status==='replied'?'replied':'pending',question:String(r.question||'')};});if(!confirm('导入将替换当前所有本机记录，确定继续吗？'))return;records=next;persist();alert('导入成功。');}catch(err){alert(`导入失败：${err.message}`);}finally{e.target.value='';}});
+  $('clear').addEventListener('click',()=>{if(!confirm('确定清空此浏览器中的所有记录？此操作无法撤销。'))return;records=[];persist();});
+  render();
+})();
+</script>
+</body>
+</html>
